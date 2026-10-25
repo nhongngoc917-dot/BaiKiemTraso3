@@ -1,0 +1,339 @@
+-- =====================================================================
+-- THÔNG TIN SINH VIÊN (Mày tự điền tên, MSSV, lớp vào đây nhé)
+-- Họ tên: ...........................................
+-- MSSV: .............................................
+-- Lớp: ..............................................
+-- =====================================================================
+
+-- =====================================================================
+-- PHẦN A: TRẢ LỜI CÂU HỎI LÝ THUYẾT
+-- =====================================================================
+-- Câu A1
+-- Trả lời: Vì mỗi bất động sản (PropertyForRent) bắt buộc phải thuộc về một chi nhánh (Branch) quản lý, nên branchNo phải NOT NULL. 
+-- Ngược lại, một bất động sản có thể chưa được phân công cho nhân viên (Staff) nào phụ trách, nên staffNo cho phép NULL.
+
+-- Câu A2
+-- Trả lời: Trong bảng Viewing, cột clientNo tham chiếu đến bảng Client, cột propertyNo tham chiếu đến bảng PropertyForRent.
+-- Trong bảng Registration, cột clientNo tham chiếu đến bảng Client, cột branchNo tham chiếu đến bảng Branch.
+
+-- Câu A3
+-- Trả lời: Không. Vì khóa chính của bảng Viewing là tổ hợp (clientNo, propertyNo) nên không cho phép một khách hàng xem cùng một bất động sản 2 lần.
+-- Muốn cho phép, ta phải thêm cột viewDate (ngày xem) vào làm một phần của khóa chính (thành khóa chính gồm 3 cột).
+
+-- Câu A4
+-- Trả lời: Cột staffNo trong Registration xuất phát từ mối quan hệ "Nhân viên làm thủ tục đăng ký cho khách hàng" (Staff - Registration).
+-- Nó NOT NULL vì theo quy tắc nghiệp vụ, mỗi một lượt đăng ký bắt buộc phải do một nhân viên cụ thể thực hiện và chịu trách nhiệm.
+
+
+-- =====================================================================
+-- PHẦN B: CÀI ĐẶT CƠ SỞ DỮ LIỆU
+-- =====================================================================
+-- Câu B1. Tạo CSDL
+DROP DATABASE IF EXISTS DREAMHOME;
+CREATE DATABASE DREAMHOME;
+USE DREAMHOME;
+
+-- Câu B2. Tạo 7 bảng theo đặc tả
+-- 1. Bảng Branch
+CREATE TABLE Branch (
+    branchNo CHAR(4) NOT NULL,
+    street VARCHAR(50) NOT NULL,
+    city VARCHAR(30) NOT NULL,
+    postcode VARCHAR(10),
+    CONSTRAINT PK_Branch PRIMARY KEY (branchNo)
+);
+
+-- 2. Bảng Staff
+CREATE TABLE Staff (
+    staffNo CHAR(5) NOT NULL,
+    fName VARCHAR(30) NOT NULL,
+    lName VARCHAR(30) NOT NULL,
+    position VARCHAR(15) NOT NULL,
+    sex CHAR(1),
+    DOB DATE,
+    salary DECIMAL(9,2) NOT NULL,
+    branchNo CHAR(4) NOT NULL,
+    CONSTRAINT PK_Staff PRIMARY KEY (staffNo),
+    CONSTRAINT CK_Staff_position CHECK (position IN ('Manager', 'Supervisor', 'Assistant')),
+    CONSTRAINT CK_Staff_sex CHECK (sex IN ('M', 'F')),
+    CONSTRAINT CK_Staff_salary CHECK (salary > 0),
+    CONSTRAINT FK_Staff_Branch FOREIGN KEY (branchNo) REFERENCES Branch(branchNo) ON DELETE NO ACTION ON UPDATE NO ACTION
+);
+
+-- 3. Bảng PrivateOwner
+CREATE TABLE PrivateOwner (
+    ownerNo CHAR(5) NOT NULL,
+    fName VARCHAR(30) NOT NULL,
+    lName VARCHAR(30) NOT NULL,
+    address VARCHAR(60) NOT NULL,
+    telNo VARCHAR(15),
+    eMail VARCHAR(50),
+    CONSTRAINT PK_PrivateOwner PRIMARY KEY (ownerNo)
+);
+
+-- 4. Bảng PropertyForRent
+CREATE TABLE PropertyForRent (
+    propertyNo CHAR(5) NOT NULL,
+    street VARCHAR(50) NOT NULL,
+    city VARCHAR(30) NOT NULL,
+    postcode VARCHAR(10),
+    type VARCHAR(10) NOT NULL,
+    rooms INT NOT NULL,
+    rent DECIMAL(9,2) NOT NULL,
+    ownerNo CHAR(5) NOT NULL,
+    staffNo CHAR(5),
+    branchNo CHAR(4) NOT NULL,
+    CONSTRAINT PK_PropertyForRent PRIMARY KEY (propertyNo),
+    CONSTRAINT CK_Property_type CHECK (type IN ('House', 'Flat')),
+    CONSTRAINT CK_Property_rooms CHECK (rooms BETWEEN 1 AND 15),
+    CONSTRAINT CK_Property_rent CHECK (rent > 0),
+    CONSTRAINT FK_Property_Owner FOREIGN KEY (ownerNo) REFERENCES PrivateOwner(ownerNo) ON DELETE NO ACTION ON UPDATE CASCADE,
+    CONSTRAINT FK_Property_Staff FOREIGN KEY (staffNo) REFERENCES Staff(staffNo) ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT FK_Property_Branch FOREIGN KEY (branchNo) REFERENCES Branch(branchNo) ON DELETE NO ACTION ON UPDATE NO ACTION
+);
+
+-- 5. Bảng Client
+CREATE TABLE Client (
+    clientNo CHAR(5) NOT NULL,
+    fName VARCHAR(30) NOT NULL,
+    lName VARCHAR(30) NOT NULL,
+    telNo VARCHAR(15) NOT NULL,
+    prefType VARCHAR(10),
+    maxRent DECIMAL(9,2),
+    eMail VARCHAR(50) NOT NULL,
+    CONSTRAINT PK_Client PRIMARY KEY (clientNo),
+    CONSTRAINT UQ_Client_eMail UNIQUE (eMail),
+    CONSTRAINT CK_Client_prefType CHECK (prefType IN ('House', 'Flat')),
+    CONSTRAINT CK_Client_maxRent CHECK (maxRent > 0)
+);
+
+-- 6. Bảng Viewing
+CREATE TABLE Viewing (
+    clientNo CHAR(5) NOT NULL,
+    propertyNo CHAR(5) NOT NULL,
+    viewDate DATE NOT NULL,
+    comment VARCHAR(100),
+    CONSTRAINT PK_Viewing PRIMARY KEY (clientNo, propertyNo),
+    CONSTRAINT FK_Viewing_Client FOREIGN KEY (clientNo) REFERENCES Client(clientNo) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT FK_Viewing_Property FOREIGN KEY (propertyNo) REFERENCES PropertyForRent(propertyNo) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- 7. Bảng Registration
+CREATE TABLE Registration (
+    clientNo CHAR(5) NOT NULL,
+    branchNo CHAR(4) NOT NULL,
+    staffNo CHAR(5) NOT NULL,
+    dateJoined DATE NOT NULL DEFAULT (CURRENT_DATE),
+    CONSTRAINT PK_Registration PRIMARY KEY (clientNo, branchNo),
+    CONSTRAINT FK_Registration_Client FOREIGN KEY (clientNo) REFERENCES Client(clientNo) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT FK_Registration_Branch FOREIGN KEY (branchNo) REFERENCES Branch(branchNo) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    CONSTRAINT FK_Registration_Staff FOREIGN KEY (staffNo) REFERENCES Staff(staffNo) ON DELETE NO ACTION ON UPDATE CASCADE
+);
+
+-- Câu B3. Giải thích ràng buộc
+-- (a) Vì sao FK_Property_Staff chọn ON DELETE SET NULL:
+-- Vì một căn nhà (Property) có thể chưa được phân công cho nhân viên nào quản lý (staffNo = NULL). 
+-- Khi nhân viên đó nghỉ việc (bị xóa khỏi bảng Staff), căn nhà vẫn phải tồn tại để tiếp tục cho thuê, 
+-- do đó chỉ cần set staffNo của căn nhà đó thành NULL (chưa có người quản lý) chứ không được xóa luôn căn nhà.
+
+-- (b) Vì sao mọi khóa ngoại đến Branch đều là NO ACTION cho cả xóa và sửa:
+-- (Theo lý thuyết SQL Server về "Multiple Cascade Paths" - Nhiều đường lan truyền).
+-- Nếu ta đặt CASCADE cho các bảng cùng trỏ đến Branch, việc xóa/sửa một Branch có thể kích hoạt 
+-- việc xóa/sửa lan truyền đồng thời qua nhiều đường. Điều này gây ra lỗi vòng lặp hoặc xung đột đường dẫn. 
+-- Do đó, SQL Server bắt buộc các FK đến cùng một bảng cha phải là NO ACTION.
+
+
+-- =====================================================================
+-- PHẦN C: NHẬP DỮ LIỆU VÀ TRUY VẤN CƠ BẢN
+-- =====================================================================
+-- Câu C1. Nhập dữ liệu (Cha trước, Con sau)
+-- 1. Branch
+INSERT INTO Branch VALUES 
+('B005', '22 Deer Rd', 'London', 'SW1 4EH'),
+('B007', '16 Argyll St', 'Aberdeen', 'AB2 3SU'),
+('B003', '163 Main St', 'Glasgow', 'G11 9QX'),
+('B004', '32 Manse Rd', 'Bristol', 'BS99 1NZ'),
+('B002', '56 Clover Dr', 'London', 'NW10 6EU');
+
+-- 2. Staff
+INSERT INTO Staff VALUES 
+('SL21', 'John', 'White', 'Manager', 'M', '1945-10-01', 30000, 'B005'),
+('SG37', 'Ann', 'Beech', 'Assistant', 'F', '1960-11-10', 12000, 'B003'),
+('SG14', 'David', 'Ford', 'Supervisor', 'M', '1958-03-24', 18000, 'B003'),
+('SA9', 'Mary', 'Howe', 'Assistant', 'F', '1970-02-19', 9000, 'B007'),
+('SG5', 'Susan', 'Brand', 'Manager', 'F', '1940-06-03', 24000, 'B003'),
+('SL41', 'Julie', 'Lee', 'Assistant', 'F', '1965-06-13', 9000, 'B005');
+
+-- 3. PrivateOwner
+INSERT INTO PrivateOwner VALUES 
+('CO46', 'Joe', 'Keogh', '2 Fergus Dr, Aberdeen AB2 7SX', '01224-861212', 'jkeogh@lhh.com'),
+('CO87', 'Carol', 'Farrel', '6 Achray St, Glasgow G32 9DX', '0141-357-7419', 'cfarrel@gmail.com'),
+('CO40', 'Tina', 'Murphy', '63 Well St, Glasgow G42', '0141-943-1728', 'tinam@hotmail.com'),
+('CO93', 'Tony', 'Shaw', '12 Park Pl, Glasgow G4 0QR', '0141-225-7025', 'tony.shaw@ark.com');
+
+-- 4. PropertyForRent
+INSERT INTO PropertyForRent VALUES 
+('PA14', '16 Holhead', 'Aberdeen', 'AB7 5SU', 'House', 6, 650, 'CO46', 'SA9', 'B007'),
+('PL94', '6 Argyll St', 'London', 'NW2', 'Flat', 4, 400, 'CO87', 'SL41', 'B005'),
+('PG4', '6 Lawrence St', 'Glasgow', 'G11 9QX', 'Flat', 3, 350, 'CO40', NULL, 'B003'),
+('PG36', '2 Manor Rd', 'Glasgow', 'G32 4QX', 'Flat', 3, 375, 'CO93', 'SG37', 'B003'),
+('PG21', '18 Dale Rd', 'Glasgow', 'G12', 'House', 5, 600, 'CO87', 'SG37', 'B003'),
+('PG16', '5 Novar Dr', 'Glasgow', 'G12 9AX', 'Flat', 4, 450, 'CO93', 'SG14', 'B003');
+
+-- 5. Client
+INSERT INTO Client VALUES 
+('CR76', 'John', 'Kay', '0207-774-5632', 'Flat', 425, 'john.kay@gmail.com'),
+('CR56', 'Aline', 'Stewart', '0141-848-1825', 'Flat', 350, 'astewart@hotmail.com'),
+('CR74', 'Mike', 'Ritchie', '01475-392178', 'House', 750, 'mritchie01@yahoo.co.uk'),
+('CR62', 'Mary', 'Tregear', '01224-196720', 'Flat', 600, 'maryt@hotmail.co.uk');
+
+-- 6. Viewing
+INSERT INTO Viewing VALUES 
+('CR56', 'PA14', '2013-05-24', 'too small'),
+('CR76', 'PG4', '2013-04-20', 'too remote'),
+('CR56', 'PG4', '2013-05-26', NULL),
+('CR62', 'PA14', '2013-05-14', 'no dining room'),
+('CR56', 'PG36', '2013-04-28', NULL);
+
+-- 7. Registration
+INSERT INTO Registration VALUES 
+('CR76', 'B005', 'SL41', '2013-01-02'),
+('CR56', 'B003', 'SG37', '2012-04-11'),
+('CR74', 'B003', 'SG37', '2011-11-16'),
+('CR62', 'B007', 'SA9', '2012-03-07');
+
+-- Câu C2. Đếm số dòng
+SELECT 'Branch' AS TenBang, COUNT(*) AS SoDong FROM Branch
+UNION ALL SELECT 'Staff', COUNT(*) FROM Staff
+UNION ALL SELECT 'PrivateOwner', COUNT(*) FROM PrivateOwner
+UNION ALL SELECT 'PropertyForRent', COUNT(*) FROM PropertyForRent
+UNION ALL SELECT 'Client', COUNT(*) FROM Client
+UNION ALL SELECT 'Viewing', COUNT(*) FROM Viewing
+UNION ALL SELECT 'Registration', COUNT(*) FROM Registration;
+-- Kết quả thực tế: Branch 5, Staff 6, PrivateOwner 4, PropertyForRent 6, Client 4, Viewing 5, Registration 4.
+
+
+-- =====================================================================
+-- PHẦN D: KIỂM TRA RÀNG BUỘC VÀ THAO TÁC DỮ LIỆU
+-- =====================================================================
+-- ==========================================
+-- Câu D1
+-- ==========================================
+-- Dự đoán: LỖI. Lệnh INSERT vi phạm ràng buộc CHECK (vì 'Director' không nằm trong danh sách cho phép). Số dòng bị thay đổi: 0.
+USE DREAMHOME;
+START TRANSACTION;
+    INSERT INTO Staff
+    VALUES ('SG99', 'Tom', 'Daly', 'Director', 'M', '1980-01-01', 20000, 'B003');
+ROLLBACK;
+-- Kết quả thực tế: Error Code: 3819. Check constraint 'CK_Staff_position' is violated. (0 rows affected)
+-- Ràng buộc liên quan: Ràng buộc CHECK (CK_Staff_position) trên cột position.
+
+
+-- ==========================================
+-- Câu D2
+-- ==========================================
+-- Dự đoán: LỖI. Lệnh INSERT vi phạm ràng buộc khóa ngoại (FOREIGN KEY) vì mã nhánh 'B009' không tồn tại trong bảng Branch. Số dòng bị thay đổi: 0.
+START TRANSACTION;
+    INSERT INTO PropertyForRent
+    VALUES ('PG99', '1 King St', 'Glasgow', 'G1 1AA', 'Flat', 2, 300, 'CO40', 'SG14', 'B009');
+ROLLBACK;
+-- Kết quả thực tế: Error Code: 1452. Cannot add or update a child row: a foreign key constraint fails (0 rows affected)
+-- Ràng buộc liên quan: Khóa ngoại (FK_Property_Branch) tham chiếu từ bảng PropertyForRent đến bảng Branch.
+
+
+-- ==========================================
+-- Câu D3
+-- ==========================================
+-- Dự đoán: LỖI. Trùng khóa chính (clientNo, propertyNo) đã tồn tại. 0 dòng bị thay đổi.
+START TRANSACTION;
+    INSERT INTO Viewing
+    VALUES ('CR56', 'PA14', '2013-06-01', 'second visit');
+ROLLBACK;
+-- Kết quả thực tế: Error Code: 1062. Duplicate entry 'CR56-PA14' for key 'viewing.PRIMARY' (0 rows affected)
+-- Ràng buộc liên quan: Khóa chính (PK_Viewing) của bảng Viewing.
+
+
+-- ==========================================
+-- Câu D4
+-- ==========================================
+-- Dự đoán: THÀNH CÔNG. Cột dateJoined có giá trị mặc định. 1 dòng bị thêm vào Registration.
+START TRANSACTION;
+    INSERT INTO Registration (clientNo, branchNo, staffNo)
+    VALUES ('CR74', 'B005', 'SL41');
+    SELECT * FROM Registration WHERE clientNo = 'CR74';
+ROLLBACK;
+-- Kết quả thực tế: 1 row affected. Dòng mới có dateJoined tự động sinh ra (ngày hiện tại).
+-- Ràng buộc liên quan: DEFAULT constraint (DF_Registration_dateJoined).
+
+
+-- ==========================================
+-- Câu D5
+-- ==========================================
+-- Dự đoán: THÀNH CÔNG. Xóa Client CR56 và tự động xóa các dòng liên quan ở bảng con (Viewing, Registration) do có ON DELETE CASCADE.
+START TRANSACTION;
+    DELETE FROM Client WHERE clientNo = 'CR56';
+    SELECT * FROM Viewing WHERE clientNo = 'CR56';
+    SELECT * FROM Registration WHERE clientNo = 'CR56';
+ROLLBACK;
+-- Kết quả thực tế: 1 row affected ở Client. Các bảng con (Viewing/Registration) không còn dòng nào của CR56 (Empty set).
+-- Ràng buộc liên quan: Khóa ngoại có ON DELETE CASCADE.
+
+
+-- ==========================================
+-- Câu D6
+-- ==========================================
+-- Dự đoán: THÀNH CÔNG. Xóa Staff SG14, tự động set staffNo = NULL ở bảng PropertyForRent do có ON DELETE SET NULL.
+START TRANSACTION;
+    DELETE FROM Staff WHERE staffNo = 'SG14';
+    SELECT * FROM PropertyForRent WHERE staffNo IS NULL; 
+ROLLBACK;
+-- Kết quả thực tế: 1 row affected ở Staff. staffNo của các property liên quan chuyển thành NULL.
+-- Ràng buộc liên quan: Khóa ngoại (FK_Property_Staff) có ON DELETE SET NULL.
+
+
+-- ==========================================
+-- Câu D7
+-- ==========================================
+-- Dự đoán: LỖI. Staff SG37 đang được tham chiếu, FK NO ACTION chặn xóa. 0 dòng bị ảnh hưởng.
+START TRANSACTION;
+    DELETE FROM Staff WHERE staffNo = 'SG37';
+ROLLBACK;
+-- Kết quả thực tế: Error Code: 1451. Cannot delete or update a parent row: a foreign key constraint fails (0 rows affected)
+-- Ràng buộc liên quan: Khóa ngoại chặn xóa (NO ACTION).
+
+
+-- ==========================================
+-- Câu D8
+-- ==========================================
+-- Dự đoán: LỖI. Branch B004 đang được tham chiếu, FK NO ACTION chặn xóa. 0 dòng bị ảnh hưởng.
+START TRANSACTION;
+    DELETE FROM Branch WHERE branchNo = 'B004';
+ROLLBACK;
+-- Kết quả thực tế: Error Code: 1451. Cannot delete or update a parent row: a foreign key constraint fails (0 rows affected)
+-- Ràng buộc liên quan: Khóa ngoại chặn xóa (NO ACTION).
+
+
+-- ==========================================
+-- Câu D9
+-- ==========================================
+-- Dự đoán: THÀNH CÔNG. Cập nhật tăng giá 10% cho các property ở B003.
+START TRANSACTION;
+    UPDATE PropertyForRent SET rent = rent * 1.1 WHERE branchNo = 'B003';
+    SELECT propertyNo, rent FROM PropertyForRent WHERE branchNo = 'B003';
+ROLLBACK;
+-- Kết quả thực tế: 4 rows affected. Giá rent của các property tại B003 đã tăng 10%.
+-- Ràng buộc liên quan: Không vi phạm ràng buộc nào.
+
+
+-- ==========================================
+-- Câu D10
+-- ==========================================
+-- Dự đoán: LỖI. Không thể đổi mã nhân viên vì bị khóa ngoại chặn (do bảng PropertyForRent tham chiếu đến).
+START TRANSACTION;
+    UPDATE Staff SET staffNo = 'SG40' WHERE staffNo = 'SG37';
+    SELECT * FROM PropertyForRent WHERE staffNo = 'SG40';
+ROLLBACK;
+-- Kết quả thực tế: Lệnh UPDATE báo lỗi (0 rows affected). Không thể cập nhật do khóa ngoại FK_Property_Staff chặn.
+-- Ràng buộc liên quan: Khóa ngoại (FOREIGN KEY).
+
+-- nếu nhìn không ra đổi file từ txt về Sql, cảm ơn đã đọc, xin cảm ơn
